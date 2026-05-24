@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Un Paso a la Vez - NeuroDance</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            text-align: center;
+            color: white;
+            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('fondo.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            height: 100vh;
+            overflow: hidden;
+            transition: background 0.3s;
+        }
+
+        .fondo-juego-activo { background: black !important; background-image: none !important; }
+        .pantalla { display: none; height: 100vh; flex-direction: column; justify-content: center; align-items: center; }
+        .activa { display: flex; }
+        .titulo-neon { font-size: 5rem; text-shadow: 0 0 10px #ff0077, 0 0 20px #ff0077; margin-bottom: 20px; }
+        .contenedor-opciones { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+        .tarjeta { background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; width: 250px; cursor: pointer; border: 2px solid #00ccff; transition: 0.3s; }
+        .tarjeta:hover { border-color: #ff0077; transform: scale(1.05); }
+        .img-menu { width: 100%; max-height: 180px; object-fit: contain; border-radius: 10px; margin-top: 15px; display: block; }
+
+        /* --- AREAS DE JUEGO --- */
+        #game-area {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%; height: 500px;
+            z-index: 1;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: none;
+        }
+
+        /* DISEÑO DDR (Coreografía) */
+        .pista-baile {
+            position: relative;
+            width: 450px; height: 100vh;
+            background: rgba(255,255,255,0.05);
+            display: none; justify-content: center;
+        }
+        .zona-receptores { position: absolute; top: 50px; display: flex; gap: 20px; }
+        .receptor { width: 70px; height: 70px; border: 2px solid rgba(255,255,255,0.3); border-radius: 10px; font-size: 40px; display: flex; justify-content: center; align-items: center; }
+        .receptor.activo {
+    background: #00ccff;
+    box-shadow: 0 0 20px #00ccff, 0 0 40px #00ccff;
+    transform: scale(1.2);
+    transition: 0.1s;
+}
+        
+        .flecha-nota {
+            position: absolute;
+            font-size: 60px;
+            animation: subirNota 3s linear forwards;
+        }
+        @keyframes subirNota {
+            0% { top: 100vh; opacity: 0; }
+            10% { opacity: 1; }
+            100% { top: 50px; opacity: 0; }
+        }
+
+        /* DISEÑO CAÍDA (Aleatorio) */
+        .flecha-caida {
+            position: absolute;
+            width: 100%;
+            font-size: 110px; 
+            font-weight: bold;
+            -webkit-text-stroke: 2px black;
+            text-shadow: 0 0 20px rgba(0,0,0,1);
+            animation: caer var(--duracion, 2.8s) linear forwards; 
+        }
+
+        @keyframes caer {
+            0% { top: -200px; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 400px; opacity: 0; }
+        }
+
+        .circulo-color { 
+    width: 220px; 
+    height: 220px; 
+    border-radius: 50%; 
+    border: 5px solid white; 
+    display: block;
+    margin: 0 auto;
+}
+
+        /* --- CONTROLES --- */
+        .btn-ctrl, .btn-motivate { padding: 15px 25px; border-radius: 10px; font-weight: bold; color: white; border: none; cursor: pointer; margin: 5px; min-width: 110px; z-index: 20; }
+        .btn-motivate { background: #ff0077; }
+        .contenedor-controles { position: relative; z-index: 10; margin-top: 400px; }
+        .controles-velocidad { display: flex; gap: 10px; margin-top: 10px; justify-content: center; }
+
+       .mensaje-motivador {
+
+    position: fixed;
+    top: 18%;
+
+    background: rgba(255,255,255,0.95);
+    color: #222;
+
+    padding: 18px 28px;
+    border-radius: 20px;
+
+    font-size: 1.3rem;
+    font-weight: bold;
+
+    max-width: 300px;
+
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+
+    z-index: 99999;
+
+    animation: aparecerMensaje 4s ease forwards;
+}
+   @keyframes aparecerMensaje {
+
+    0%{
+        opacity:0;
+        transform: translateY(30px);
+    }
+
+    15%{
+        opacity:1;
+        transform: translateY(0px);
+    }
+
+    85%{
+        opacity:1;
+        transform: translateY(0px);
+    }
+
+    100%{
+        opacity:0;
+        transform: translateY(-20px);
+    }
+}     
+       
+</style>
+</head>
+<body>
+
+    <div id="pantalla-bienvenida" class="pantalla activa">
+        <h1 class="titulo-neon">UN PASO A LA VEZ</h1>
+        <button class="btn-ctrl" style="background:#ff0077; font-size: 1.5rem;" onclick="mostrarPantalla('pantalla-menu')">COMENZAR</button>
+    </div>
+
+    <div id="pantalla-menu" class="pantalla">
+        <h2 style="font-size: 2.5rem;">Selecciona el Modo</h2>
+        <div class="contenedor-opciones">
+            <div class="tarjeta" onclick="mostrarPantalla('pantalla-secuencias')">
+            <h3>SIMPLE</h3>
+                <img src="cuadro aleatorio.png" class="img-menu">
+            </div>
+            <div class="tarjeta" onclick="mostrarPantalla('pantalla-canciones')">
+                <h3>AVANZADO</h3>
+                <img src="cuadro coreografia.png" class="img-menu">
+            </div>
+        </div>
+    </div>
+    <div id="pantalla-secuencias" class="pantalla">
+
+    <h2 style="font-size: 2.5rem;">Elige una Secuencia</h2>
+
+    <div class="contenedor-opciones">
+
+        <div class="tarjeta" onclick="seleccionarSecuencia('seq1')">
+            <h3>SECUENCIA 1</h3>
+        </div>
+
+        <div class="tarjeta" onclick="seleccionarSecuencia('seq2')">
+            <h3>SECUENCIA 2</h3>
+        </div>
+
+    </div>
+
+    <button class="btn-ctrl"
+        style="background:#444; margin-top:30px;"
+        onclick="mostrarPantalla('pantalla-menu')">
+
+        Volver
+
+    </button>
+
+</div>
+    <div id="pantalla-canciones" class="pantalla">
+        <h2 style="font-size: 2.5rem;">Elige tu Canción</h2>
+        <div class="contenedor-opciones">
+            <div class="tarjeta" onclick="seleccionarCancion('cancion1')">Canción 1</div>
+            <div class="tarjeta" onclick="seleccionarCancion('cancion2')">Canción 2</div>
+            <div class="tarjeta" onclick="seleccionarCancion('cancion3')">Canción 3</div>
+        </div>
+        <button class="btn-ctrl" style="background:#444; margin-top:30px;" onclick="mostrarPantalla('pantalla-menu')">Volver</button>
+    </div>
+
+    <div id="pantalla-juego" class="pantalla">
+        
+        <div id="game-area"></div>
+        <div id="pista-ddr" class="pista-baile">
+            <div class="zona-receptores">
+                <div class="receptor">⬅️</div><div class="receptor">⬆️</div><div class="receptor">⬇️</div><div class="receptor">➡️</div>
+            </div>
+            <div id="notas-ddr"></div>
+        </div>
+        
+        <div class="contenedor-controles">
+            <div>
+               
+                <button class="btn-ctrl" style="background: #2ecc71;" onclick="startGame()">INICIAR</button>
+                <button class="btn-ctrl" style="background: #f1c40f; color: black;" onclick="detenerJuego()">DETENER</button>
+                <button class="btn-ctrl" style="background: #e74c3c;" onclick="irAMenu()">SALIR</button>
+                <button class="btn-ctrl" style="background:#555;" onclick="toggleVoz()" id="btn-voz">Quitar voz guía</button>
+
+            </div>
+            <div id="ctrl-velocidad-aleatorio" class="controles-velocidad">
+                <button class="btn-ctrl" style="background: #3498db;" onclick="ajustarManual(200)">🐢 - Velocidad</button>
+                <button class="btn-ctrl" style="background: #9b59b6;" onclick="ajustarManual(-200)">⚡ + Velocidad</button>
+            </div>
+        </div>
+    </div>
+   
+  <div id="ctrl-velocidad-coreo" class="controles-velocidad" style="display:none;">
+    <button class="btn-ctrl" style="background:#3498db;" onclick="cambiarVelocidadCoreo(-0.1)">🐢 Lento</button>
+    <button class="btn-ctrl" style="background:#9b59b6;" onclick="cambiarVelocidadCoreo(0.1)">⚡ Rápido</button>
+</div>
+
+    <audio id="music"></audio>
+
+<script>
+    let modo = "";
+    let intervalo;
+    let rafCoreo;
+    let ajusteManualVelocidad = 0;
+    let secuenciaActual = [];
+    let indiceSecuencia = 0;
+    let notasCoreoRestantes = [];
+    let velocidadCoreo = 1;
+    let tiempoInicioPatron = 0;
+    let numeroCiclo = 0;
+    let ultimoMensajeCoreo = 0;
+    let vozActiva = true;
+
+    const frasesMotivadoras = ["¡Exacto, sigue así!", "¡Cada paso cuenta!", "¡Vas muy bien!", "¡Casi lo tienes!"];
+    const mensajesInicio = [
+    "Muy bien, vamos paso a paso",
+    "Tranquilo, sigue el ritmo",
+    "Lo estás haciendo excelente",
+    "concéntrate",
+    "Perfecto, aprende primero el movimiento",
+    "No importa equivocarse, sigue intentando",
+    "Continua asi"
+];
+
+const mensajesMedios = [
+    "¡Eso! ya estas entendiendo",
+    "Muy bien, cada vez más rápido",
+    "Excelente coordinación",
+    "Ya estás anticipando los movimientos",
+    "Tu ritmo está mejorando",
+    "Muy buen trabajo",
+    "Sigue así, ya casi lo dominas"
+];
+
+const mensajesAvanzados = [
+    "¡Increíble reflejo!",
+    "Ya dominas este patrón",
+    "Excelente velocidad",
+    "Muy buena memoria motora",
+    "Tu coordinación está aumentando",
+    "Eso estuvo genial",
+    "¡Nivel avanzado desbloqueado!"
+];
+    // COMANDOS ALEATORIOS (LOS 12 COMPLETOS)
+const secuencias = {
+
+seq1: [
+
+    // BLOQUE 1 x2
+    { s:'PIE DERECHO ADELANTE', v:'pie derecho adelante', c:'#00ccff' },
+    { s:'PIE IZQUIERDO ATRÁS', v:'pie izquierdo atrás', c:'#00ccff' },
+    { s:'PIE DERECHO ATRÁS', v:'pie derecho atrás', c:'#00ccff' },
+    { s:'PIE IZQUIERDO ADELANTE', v:'pie izquierdo adelante', c:'#00ccff' },
+
+    { s:'PIE DERECHO ADELANTE', v:'pie derecho adelante', c:'#00ccff' },
+    { s:'PIE IZQUIERDO ATRÁS', v:'pie izquierdo atrás', c:'#00ccff' },
+    { s:'PIE DERECHO ATRÁS', v:'pie derecho atrás', c:'#00ccff' },
+    { s:'PIE IZQUIERDO ADELANTE', v:'pie izquierdo adelante', c:'#00ccff' },
+
+    // BLOQUE 2 x2
+    { s:'PIE DERECHO AL LADO', v:'pie derecho al lado', c:'#00ccff' },
+    { s:'PIE IZQUIERDO AL LADO', v:'pie izquierdo al lado', c:'#00ccff' },
+
+   { s:'PIE DERECHO AL LADO', v:'pie derecho al lado', c:'#00ccff' },
+   { s:'PIE IZQUIERDO AL LADO', v:'pie izquierdo al lado', c:'#00ccff' },
+
+    // BLOQUE 3 x2
+    { s:'PIE DERECHO ROJO', v:'pie derecho rojo', c:'red' },
+    { s:'PIE IZQUIERDO VERDE', v:'pie izquierdo verde', c:'green' },
+    { s:'PIE DERECHO AMARILLO', v:'pie derecho amarillo', c:'yellow' },
+    { s:'PIE IZQUIERDO MORADO', v:'pie izquierdo morado', c:'#d8b4fe' },
+
+    { s:'PIE DERECHO ROJO', v:'pie derecho rojo', c:'red' },
+    { s:'PIE IZQUIERDO VERDE', v:'pie izquierdo verde', c:'green' },
+    { s:'PIE DERECHO AMARILLO', v:'pie derecho amarillo', c:'yellow' },
+    { s:'PIE IZQUIERDO MORADO', v:'pie izquierdo morado', c:'#d8b4fe' }
+
+],
+
+seq2: [
+
+    // ===== BLOQUE 1 =====
+    // marcha cruzada básica
+
+    {
+        s:'PIE DERECHO ADELANTE + MANO IZQUIERDA ARRIBA',
+        v:'pie derecho adelante y mano izquierda arriba',
+        c:'#00ccff'
+    },
+
+    {
+        s:'PIE IZQUIERDO ADELANTE + MANO DERECHA ARRIBA',
+        v:'pie izquierdo adelante y mano derecha arriba',
+        c:'#00ccff'
+    },
+
+    {
+        s:'PIE DERECHO ATRÁS + MANO IZQUIERDA ATRÁS',
+        v:'pie derecho atrás y mano izquierda atrás',
+        c:'#00ccff'
+    },
+
+    {
+        s:'PIE IZQUIERDO ATRÁS + MANO DERECHA ATRÁS',
+        v:'pie izquierdo atrás y mano derecha atrás',
+        c:'#00ccff'
+    },
+
+    // repetir
+    {
+        s:'PIE DERECHO ADELANTE + MANO IZQUIERDA ARRIBA',
+        v:'pie derecho adelante y mano izquierda arriba',
+        c:'#00ccff'
+    },
+
+    {
+        s:'PIE IZQUIERDO ADELANTE + MANO DERECHA ARRIBA',
+        v:'pie izquierdo adelante y mano derecha arriba',
+        c:'#00ccff'
+    },
+
+    // ===== BLOQUE 2 =====
+    // lateralidad
+
+    {
+        s:'PIE DERECHO AL LADO + MANOS ARRIBA',
+        v:'pie derecho al lado y manos arriba',
+        c:'#00ccff'
+    },
+
+    {
+        s:'PIE IZQUIERDO AL LADO + MANOS ATRAS',
+        v:'pie izquierdo al lado y manos atras',
+        c:'#00ccff'
+    },
+
+    // ===== BLOQUE 3 =====
+    // colores + miembros superiores
+
+    {
+        s:'PIE DERECHO ROJO + MANO IZQUIERDA ARRIBA',
+        v:'pie derecho rojo y mano izquierda arriba',
+        c:'red'
+    },
+
+    {
+        s:'PIE IZQUIERDO VERDE + MANO DERECHA ARRIBA',
+        v:'pie izquierdo verde y mano derecha arriba',
+        c:'green'
+    },
+
+    {
+        s:'PIE DERECHO AMARILLO + MANOS ARRIBA',
+        v:'pie derecho amarillo y manos arriba',
+        c:'yellow'
+    },
+
+    {
+        s:'PIE IZQUIERDO MORADO + MANOS ARRIBA',
+        v:'pie izquierdo morado y manos arriba',
+        c:'#d8b4fe'
+    }
+
+]
+
+};
+
+    function generarPatron(pasos, reps, esp) {
+        let f = [];
+        for(let i=0; i<reps; i++) { pasos.forEach(p => f.push({ t: p.t + (i * esp), n: p.n })); }
+        return f;
+    }
+   function unirPatrones(...patrones){
+    let tiempo = 0;
+    let resultado = [];
+
+    patrones.forEach(p => {
+        p.forEach(nota => {
+            resultado.push({
+                t: nota.t + tiempo,
+                n: nota.n
+            });
+        });
+        tiempo = resultado[resultado.length - 1].t;
+    });
+
+    return resultado;
+}
+
+    function repetirCiclo(ciclo, veces){
+    let resultado = [];
+    let duracion = ciclo[ciclo.length - 1].t;
+
+    for(let i=0; i<veces; i++){
+        ciclo.forEach(nota => {
+            resultado.push({
+                t: nota.t + (i * duracion),
+                n: nota.n
+            });
+        });
+    }
+
+    return resultado;
+}
+
+    function mezclarArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+}
+// --- PATRONES CANCIÓN 1 ---
+
+const patronA1 = generarPatron([
+    {t:0.5, n:'IZQ'}, {t:1, n:'DER'}
+], 3, 2);
+
+const patronB1 = generarPatron([
+    {t:0.5, n:'IZQ'}, {t:1, n:'ARR'}, {t:1.5, n:'DER'}
+], 3, 2.5);
+
+const patronC1 = generarPatron([
+    {t:0.5, n:'IZQ'}, {t:0.9, n:'DER'},
+    {t:1.3, n:'ARR'}, {t:1.7, n:'ABJ'}
+], 3, 2);
+
+// unir A → B → C
+const ciclo1 = unirPatrones(patronA1, patronB1, patronC1);
+
+// repetir todo el ciclo
+const pasosCancion1 = repetirCiclo(ciclo1, 5);
+
+// --- PATRONES CANCIÓN 2 ---
+
+const patronA2 = generarPatron([
+    {t:0.5, n:'ARR'}, {t:1, n:'ABJ'}
+], 3, 2);
+
+const patronB2 = generarPatron([
+    {t:0.5, n:'IZQ'}, {t:1, n:'ARR'}, {t:1.5, n:'DER'}
+], 3, 2.3);
+
+const patronC2 = generarPatron([
+    {t:0.4, n:'IZQ'}, {t:0.8, n:'DER'},
+    {t:1.2, n:'ARR'}, {t:1.6, n:'ABJ'},
+    {t:2.0, n:'ARR'}
+], 3, 2);
+
+// unir A → B → C
+const ciclo2 = unirPatrones(patronA2, patronB2, patronC2);
+
+// repetir ciclo completo
+const pasosCancion2 = repetirCiclo(ciclo2, 5);
+
+// --- PATRONES CANCIÓN 3 ---
+
+const patronA3 = generarPatron([
+    {t:0.4, n:'IZQ'}, {t:0.8, n:'DER'}
+], 3, 1.8);
+
+const patronB3 = generarPatron([
+    {t:0.4, n:'IZQ'}, {t:0.7, n:'ARR'},
+    {t:1.0, n:'DER'}, {t:1.3, n:'ABJ'}
+], 3, 2);
+
+const patronC3 = generarPatron([
+    {t:0.3, n:'IZQ'}, {t:0.6, n:'DER'},
+    {t:0.9, n:'ARR'}, {t:1.2, n:'IZQ'},
+    {t:1.5, n:'ABJ'}, {t:1.8, n:'DER'}
+], 3, 2);
+
+// unir
+const ciclo3 = unirPatrones(patronA3, patronB3, patronC3);
+
+// repetir
+const pasosCancion3 = repetirCiclo(ciclo3, 5);
+const mapas = {
+
+    // 🔥 Patrón básico rápido (izq-der-arr-abj)
+    'cancion1': { 
+        archivo: 'cancion1.mp3.mp3', 
+        pasos: pasosCancion1
+},
+
+    // 🔥 Patrón cruzado (más desafiante)
+   'cancion2': { 
+        archivo: 'cancion2.mp3.mp3', 
+        pasos: pasosCancion2
+    },
+
+    // 🔥 Patrón tipo “combo DDR” (rápido + memoria)
+      'cancion3': { 
+        archivo: 'cancion3.mp3.mp3', 
+        pasos: pasosCancion3
+    }
+
+};
+
+    function mostrarPantalla(id){
+        document.querySelectorAll('.pantalla').forEach(p=>p.classList.remove('activa'));
+        document.getElementById(id).classList.add('activa');
+    }
+    function cambiarVelocidadCoreo(delta){
+    const audio = document.getElementById("music");
+    velocidadCoreo = Math.max(0.5, Math.min(2, velocidadCoreo + delta));
+    audio.playbackRate = velocidadCoreo;
+}
+
+    function seleccionarCancion(id){
+        modo = "coreo";
+        const m = mapas[id];
+        document.getElementById("music").src = m.archivo;
+        window.repeticionesCiclo = 0;
+        tiempoInicioPatron = 0;
+notasCoreoRestantes = m.pasos.map(p => ({ t: p.t, n: p.n }));
+        document.getElementById("pista-ddr").style.display = "flex";
+        document.getElementById("game-area").style.display = "none";
+        document.getElementById("ctrl-velocidad-coreo").style.display = "flex";
+        document.getElementById("ctrl-velocidad-aleatorio").style.display = "none";
+        mostrarPantalla('pantalla-juego');
+    }
+    function seleccionarSecuencia(id){
+
+    modo = "secuencia";
+
+    secuenciaActual = secuencias[id];
+
+    indiceSecuencia = 0;
+
+    document.getElementById("music").src = "cancion aleatoria.mp3";
+
+    document.getElementById("pista-ddr").style.display = "none";
+
+    document.getElementById("game-area").style.display = "flex";
+
+    document.getElementById("ctrl-velocidad-coreo").style.display = "none";
+
+    document.getElementById("ctrl-velocidad-aleatorio").style.display = "flex";
+
+    mostrarPantalla('pantalla-juego');
+}
+    function prepararAleatorio(){
+        modo = "aleatorio";
+        document.getElementById("music").src = "cancion aleatoria.mp3"; 
+        document.getElementById("pista-ddr").style.display = "none";
+        document.getElementById("game-area").style.display = "flex";
+        document.getElementById("ctrl-velocidad-coreo").style.display = "none";
+        document.getElementById("ctrl-velocidad-aleatorio").style.display = "flex";
+        mostrarPantalla('pantalla-juego');
+    }
+
+   function hablar(t) {
+    if(!vozActiva) return;
+
+    window.speechSynthesis.cancel();
+
+    const msg = new SpeechSynthesisUtterance(t);
+    msg.lang = "es-MX";
+
+    // 🔊 configuración de voz
+    msg.volume = 1;   // máximo
+    msg.rate = 1;     // velocidad normal
+    msg.pitch = 1;    // tono normal
+
+    
+    window.speechSynthesis.speak(msg);
+}
+
+    function toggleVoz(){
+    vozActiva = !vozActiva;
+    document.getElementById("btn-voz").innerText = 
+        vozActiva ? "Quitar voz guía" : "Activar voz guía";
+}
+    function activarMotivacion() {
+        const msg = document.createElement("div");
+        msg.className = "mensaje-motivador";
+        const texto = frasesMotivadoras[Math.floor(Math.random() * frasesMotivadoras.length)];
+        msg.innerText = texto;
+        msg.style.left = Math.random() > 0.5 ? "10%" : "70%";
+        document.getElementById("pantalla-juego").appendChild(msg);
+        hablar(texto);
+        setTimeout(() => msg.remove(), 4000);
+    }
+   function mensajePorCiclo(){
+
+    let lista = mensajesInicio;
+
+    if(window.repeticionesCiclo >= 2){
+        lista = mensajesMedios;
+    }
+
+    if(window.repeticionesCiclo >= 4){
+        lista = mensajesAvanzados;
+    }
+
+    const texto = lista[Math.floor(Math.random() * lista.length)];
+
+    const msg = document.createElement("div");
+    msg.className = "mensaje-motivador";
+    msg.innerText = texto;
+
+    // alternar lado
+    if(Math.random() > 0.5){
+        msg.style.left = "5%";
+    } else {
+        msg.style.right = "5%";
+    }
+
+    document.body.appendChild(msg);
+
+    hablar(texto);
+
+    setTimeout(() => msg.remove(), 4000);
+}
+    function ajustarManual(v) { ajusteManualVelocidad += v; if (intervalo) { clearInterval(intervalo); iniciarCiclo(); } }
+
+    function startGame(){
+        pararTodo();
+        document.body.classList.add('fondo-juego-activo');
+        document.getElementById("music").play();
+        if(modo === "secuencia"){
+        iniciarCiclo();
+}
+else{
+    bucleCoreo();
+}
+    }
+         
+      function iniciarCiclo(){
+
+    let base = 2800;
+
+// secuencia 2 más lenta
+if (
+    modo === "secuencia" &&
+    secuenciaActual === secuencias.seq2
+) {
+    base = 3800;
+}
+
+let ms = Math.max(
+    800,
+    base + ajusteManualVelocidad
+);
+
+    intervalo = setInterval(() => {
+
+        // reiniciar secuencia
+        if(indiceSecuencia >= secuenciaActual.length){
+            indiceSecuencia = 0;
+        }
+
+        // obtener paso actual
+        const paso = secuenciaActual[indiceSecuencia];
+
+        indiceSecuencia++;
+
+        // mensajes motivadores
+        if(Math.random() < 0.40){
+            mensajePorCiclo();
+        }
+
+        const area = document.getElementById("game-area");
+
+        const div = document.createElement("div");
+
+        div.className = "flecha-caida";
+
+        div.style.setProperty('--duracion', (ms/1000) + 's');
+
+        // --- VISUALES ---
+        
+        // colores
+        
+if(
+    paso.v.includes("rojo") ||
+    paso.v.includes("verde") ||
+    paso.v.includes("amarillo") ||
+    paso.v.includes("morado")
+){
+
+    // ---------- COLOR ----------
+    let colorEmoji = "🔴";
+
+    if(paso.v.includes("verde")){
+        colorEmoji = "🟢";
+    }
+
+    if(paso.v.includes("amarillo")){
+        colorEmoji = "🟡";
+    }
+
+    if(paso.v.includes("morado")){
+        colorEmoji = "🟣";
+    }
+
+    // ---------- PIE ----------
+    let pieEstilo = "";
+
+    // pie derecho = volteado
+    if(paso.v.includes("pie derecho")){
+        pieEstilo = "transform:scaleX(-1);";
+    }
+
+    // pie izquierdo = normal
+    if(paso.v.includes("pie izquierdo")){
+        pieEstilo = "";
+    }
+
+    // ---------- MANOS ----------
+    let mano = "";
+
+    if(paso.v.includes("mano izquierda")){
+        mano = "✋";
+    }
+
+    if(paso.v.includes("mano derecha")){
+        mano = "🤚";
+    }
+
+    if(
+        paso.v.includes("manos arriba") ||
+        paso.v.includes("manos atras")
+    ){
+        mano = "🙌";
+    }
+
+    // ---------- VISUAL ----------
+    div.innerHTML = `
+        <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap:12px;
+        ">
+
+            <div style="
+                font-size:65px;
+            ">
+                ${mano}
+            </div>
+
+            <div style="
+                font-size:65px;
+                display:flex;
+                gap:12px;
+                align-items:center;
+            ">
+                <span style="${pieEstilo}">
+                    🦶
+                </span>
+
+                <span>
+                    ${colorEmoji}
+                </span>
+            </div>
+
+        </div>
+    `;
+}
+        // flechas adelante/atrás/derecha/izquierda
+// flechas adelante/atrás/derecha/izquierda
+else {
+
+    // ---------- PIE ----------
+    let flechaPie = "⬆️";
+    let pieEmoji = "🦶";
+    let pieEstilo = "";
+
+    // adelante
+    if (paso.v.includes("adelante")) {
+        flechaPie = "⬆️";
+    }
+
+    // atrás
+    if (paso.v.includes("atrás")) {
+        flechaPie = "⬇️";
+    }
+
+    // pie derecho al lado
+    if (paso.v.includes("pie derecho al lado")) {
+        flechaPie = "➡️";
+    }
+
+    // pie izquierdo al lado
+    if (paso.v.includes("pie izquierdo al lado")) {
+        flechaPie = "⬅️";
+    }
+
+    // 🔥 CAMBIO:
+    // pie derecho = volteado
+    if (paso.v.includes("pie derecho")) {
+        pieEstilo = "transform:scaleX(-1);";
+    }
+
+    // pie izquierdo = normal
+    if (paso.v.includes("pie izquierdo")) {
+        pieEstilo = "";
+    }
+
+    // ---------- MANOS ----------
+    let mano = "";
+
+    // mano izquierda
+    if (paso.v.includes("mano izquierda")) {
+        mano = "✋";
+    }
+
+    // mano derecha
+    if (paso.v.includes("mano derecha")) {
+        mano = "🤚";
+    }
+
+    // dos manos
+    if (
+        paso.v.includes("manos arriba") ||
+        paso.v.includes("manos atras")
+    ) {
+        mano = "🙌";
+    }
+
+    // ---------- VISUAL ----------
+    div.innerHTML = `
+        <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap:12px;
+        ">
+
+            <div style="
+                font-size:65px;
+            ">
+                ${mano}
+            </div>
+
+            <div style="
+                font-size:65px;
+                display:flex;
+                gap:12px;
+                align-items:center;
+            ">
+                <span style="${pieEstilo}">
+                    ${pieEmoji}
+                </span>
+
+                <span>
+                    ${flechaPie}
+                </span>
+            </div>
+
+        </div>
+    `;
+
+    div.style.color = paso.c;
+}        area.appendChild(div);
+
+        hablar(paso.v);
+
+        setTimeout(() => div.remove(), ms);
+
+    }, ms);
+}
+            
+
+    function bucleCoreo() {
+    if (modo !== "coreo") return;
+
+    const audio = document.getElementById("music");
+    let cur = audio.currentTime;
+    // mensajes durante la canción
+if(cur - ultimoMensajeCoreo >= 12){
+
+    ultimoMensajeCoreo = cur;
+
+    mensajePorCiclo();
+}
+
+    if (notasCoreoRestantes.length > 0 && cur >= tiempoInicioPatron + (notasCoreoRestantes[0].t / velocidadCoreo)){
+        crearFlechaDDR(notasCoreoRestantes[0].n);
+        notasCoreoRestantes.shift();
+    }
+
+    // 🔁 cuando se acaban, reinicia SOLO el patrón
+if (notasCoreoRestantes.length === 0) {
+
+    if(!window.repeticionesCiclo) window.repeticionesCiclo = 0;
+    window.repeticionesCiclo++;
+    
+    mensajePorCiclo();
+
+    // 🔥 PROGRESIVO SUAVE
+    velocidadCoreo = Math.min(1.3, 0.7 + (window.repeticionesCiclo * 0.15));
+
+    const audio = document.getElementById("music");
+    audio.playbackRate = velocidadCoreo;
+
+    const mapaActual = Object.values(mapas).find(m => 
+        m.archivo === audio.src.split('/').pop()
+    );
+
+    if (mapaActual) {
+        tiempoInicioPatron = cur;
+        notasCoreoRestantes = mapaActual.pasos.map(p => ({ t: p.t, n: p.n }));
+    }
+}
+
+rafCoreo = requestAnimationFrame(bucleCoreo);
+}
+    function crearFlechaDDR(dir) {
+        const div = document.createElement("div");
+        div.className = "flecha-nota";
+        const config = { 'IZQ': {i:'⬅️', l:'10px'}, 'ARR': {i:'⬆️', l:'115px'}, 'ABJ': {i:'⬇️', l:'220px'}, 'DER': {i:'➡️', l:'325px'} };
+        div.style.left = config[dir].l;
+        div.innerHTML = config[dir].i;
+        document.getElementById("notas-ddr").appendChild(div);
+        const indexMap = { 'IZQ': 0, 'ARR': 1, 'ABJ': 2, 'DER': 3 };
+const receptores = document.querySelectorAll(".receptor");
+const receptor = receptores[indexMap[dir]];
+
+if(receptor){
+    receptor.classList.add("activo");
+    setTimeout(() => receptor.classList.remove("activo"), 300);
+}
+        setTimeout(() => div.remove(), 3100);
+    }
+
+    function detenerJuego(){
+        clearInterval(intervalo);
+        cancelAnimationFrame(rafCoreo);
+        document.getElementById("music").pause();
+        window.speechSynthesis.cancel();
+    }
+
+    function pararTodo(){
+        detenerJuego();
+        document.getElementById("game-area").innerHTML = "";
+        document.getElementById("notas-ddr").innerHTML = "";
+    }
+
+    function irAMenu(){ 
+        pararTodo(); 
+        document.body.classList.remove('fondo-juego-activo');
+        mostrarPantalla('pantalla-menu'); 
+    }
+</script>
+</body>
+</html> 
